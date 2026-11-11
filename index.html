@@ -1,0 +1,1066 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>밤티학교 부수기 - 스트레스 해소 게임</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- Google Fonts & FontAwesome -->
+    <link href="https://fonts.googleapis.com/css2?family=Jua&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <style>
+        body {
+            font-family: 'Jua', sans-serif;
+            user-select: none;
+            -webkit-user-select: none;
+            touch-action: manipulation;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #0f172a, #1e1b4b);
+        }
+        canvas {
+            display: block;
+            cursor: crosshair;
+        }
+        .btn-select {
+            transition: all 0.2s ease-in-out;
+        }
+        .btn-select.active {
+            border-color: #f59e0b;
+            background-color: #374151;
+            transform: scale(1.05);
+            box-shadow: 0 0 15px rgba(245, 158, 11, 0.6);
+        }
+        .pulse-btn {
+            animation: pulse 1.2s infinite alternate;
+        }
+        @keyframes pulse {
+            0% { transform: scale(1); }
+            100% { transform: scale(1.06); }
+        }
+    </style>
+</head>
+<body class="h-screen w-screen flex flex-col justify-between items-center text-white relative">
+
+    <!-- Top UI Bar -->
+    <header class="w-full max-w-5xl px-4 py-2 mt-2 flex flex-col md:flex-row justify-between items-center gap-2 z-10 bg-slate-900/90 backdrop-blur rounded-2xl shadow-xl border border-slate-700">
+        <!-- Title -->
+        <div class="flex items-center gap-3">
+            <div class="bg-amber-500 text-slate-950 p-2 rounded-xl text-2xl shadow">
+                <i class="fa-solid fa-bomb"></i>
+            </div>
+            <div>
+                <h1 class="text-2xl md:text-3xl text-amber-400 tracking-wider font-extrabold drop-shadow">밤티학교 부수기</h1>
+                <p class="text-xs text-slate-400">스트레스를 화끈하게 날려버리세요!</p>
+            </div>
+        </div>
+
+        <!-- School Health Bar & Combo -->
+        <div class="w-full md:w-5/12 flex flex-col gap-1">
+            <div class="flex justify-between text-xs md:text-sm font-bold">
+                <span id="school-name-display" class="text-cyan-400">명호초등학교 (부산)</span>
+                <span id="status-text" class="text-emerald-400">내구도: 100%</span>
+                <span id="combo-text" class="text-amber-400 font-extrabold">0 COMBO</span>
+            </div>
+            <div class="w-full bg-slate-950 rounded-full h-4 p-0.5 border border-slate-700 shadow-inner overflow-hidden">
+                <div id="hp-bar" class="bg-gradient-to-r from-emerald-400 via-amber-400 to-red-500 h-full rounded-full transition-all duration-300" style="width: 100%;"></div>
+            </div>
+        </div>
+
+        <!-- Controls (Sound & Reset) -->
+        <div class="flex gap-2">
+            <button id="sound-btn" class="bg-slate-800 hover:bg-slate-700 px-3 py-2 rounded-xl text-base shadow border border-slate-600">
+                <i id="sound-icon" class="fa-solid fa-volume-high text-amber-400"></i>
+            </button>
+            <button id="reset-btn" class="bg-rose-600 hover:bg-rose-500 active:scale-95 px-4 py-2 rounded-xl text-sm md:text-base font-bold shadow-lg transition border border-rose-400 flex items-center gap-1.5">
+                <i class="fa-solid fa-rotate-right"></i> 다시 짓기
+            </button>
+        </div>
+    </header>
+
+    <!-- Center Game Canvas Area -->
+    <main class="relative w-full h-full flex justify-center items-center overflow-hidden">
+        <canvas id="gameCanvas" class="w-full h-full"></canvas>
+
+        <!-- School Destruction Completion Modal -->
+        <div id="clear-modal" class="hidden absolute inset-0 bg-black/80 backdrop-blur-md flex flex-col justify-center items-center z-30 transition-all">
+            <div class="bg-slate-900 border-4 border-amber-400 rounded-3xl p-6 md:p-8 max-w-md text-center shadow-2xl pulse-btn">
+                <div class="text-6xl text-amber-400 mb-3">💥🏫🔥</div>
+                <h2 class="text-3xl md:text-4xl text-white font-extrabold mb-2">학교 완파 완료!</h2>
+                <p id="clear-desc" class="text-sm md:text-base text-slate-300 mb-6">학교가 형체를 알아보지 못하게 무너졌습니다.<br>오늘의 스트레스 완벽 해소!</p>
+                <button id="modal-reset-btn" class="bg-gradient-to-r from-amber-400 to-orange-500 hover:from-amber-300 hover:to-orange-400 text-slate-950 font-extrabold text-lg px-7 py-3 rounded-2xl shadow-xl active:scale-95 transition">
+                    🔄 복구 후 다시 부수기
+                </button>
+            </div>
+        </div>
+    </main>
+
+    <!-- Bottom Selection Controls (School, Character, Weapon) -->
+    <footer class="w-full max-w-5xl px-3 py-2 mb-2 z-10 bg-slate-900/90 backdrop-blur rounded-2xl shadow-2xl border border-slate-700 flex flex-col gap-2">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-2">
+            
+            <!-- 1. School Selector -->
+            <div class="bg-slate-800/80 p-2 rounded-xl border border-slate-700 flex flex-col gap-1">
+                <span class="text-xs text-amber-400 font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-school"></i> 1. 학교 선택 (부산)
+                </span>
+                <div class="grid grid-cols-2 gap-1.5">
+                    <button data-school="myungho" class="school-btn btn-select active p-1.5 rounded-lg bg-slate-700 text-xs md:text-sm font-bold border border-slate-600">
+                        🎒 명호초
+                    </button>
+                    <button data-school="sindo" class="school-btn btn-select p-1.5 rounded-lg bg-slate-700 text-xs md:text-sm font-bold border border-slate-600">
+                        🏢 신도고
+                    </button>
+                </div>
+            </div>
+
+            <!-- 2. Character Selector -->
+            <div class="bg-slate-800/80 p-2 rounded-xl border border-slate-700 flex flex-col gap-1">
+                <span class="text-xs text-amber-400 font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-user-ninja"></i> 2. 공격 캐릭터 선택
+                </span>
+                <div class="grid grid-cols-2 gap-1.5">
+                    <button data-char="hyechaeng" class="char-btn btn-select active p-1.5 rounded-lg bg-slate-700 text-xs md:text-sm font-bold border border-slate-600 flex items-center justify-center gap-1">
+                        <span>👩‍🦱</span> 혜챙 (단발)
+                    </button>
+                    <button data-char="juchaeng" class="char-btn btn-select p-1.5 rounded-lg bg-slate-700 text-xs md:text-sm font-bold border border-slate-600 flex items-center justify-center gap-1">
+                        <span>👓</span> 주챙 (안경)
+                    </button>
+                </div>
+            </div>
+
+            <!-- 3. Weapon Selector -->
+            <div class="bg-slate-800/80 p-2 rounded-xl border border-slate-700 flex flex-col gap-1">
+                <span class="text-xs text-amber-400 font-bold flex items-center gap-1">
+                    <i class="fa-solid fa-gun"></i> 3. 파괴 무기 선택
+                </span>
+                <div class="grid grid-cols-5 gap-1">
+                    <button data-weapon="hammer" class="weapon-btn btn-select active p-1 rounded-lg bg-slate-700 text-center text-xs border border-slate-600" title="망치">
+                        <div class="text-lg">🔨</div>
+                        <div class="text-[10px]">망치</div>
+                    </button>
+                    <button data-weapon="wrecking" class="weapon-btn btn-select p-1 rounded-lg bg-slate-700 text-center text-xs border border-slate-600" title="철퇴">
+                        <div class="text-lg">🏗️</div>
+                        <div class="text-[10px]">철퇴</div>
+                    </button>
+                    <button data-weapon="dynamite" class="weapon-btn btn-select p-1 rounded-lg bg-slate-700 text-center text-xs border border-slate-600" title="폭탄">
+                        <div class="text-lg">🧨</div>
+                        <div class="text-[10px]">폭탄</div>
+                    </button>
+                    <button data-weapon="laser" class="weapon-btn btn-select p-1 rounded-lg bg-slate-700 text-center text-xs border border-slate-600" title="레이저">
+                        <div class="text-lg">⚡</div>
+                        <div class="text-[10px]">레이저</div>
+                    </button>
+                    <button data-weapon="meteor" class="weapon-btn btn-select p-1 rounded-lg bg-slate-700 text-center text-xs border border-slate-600" title="운석">
+                        <div class="text-lg">☄️</div>
+                        <div class="text-[10px]">운석</div>
+                    </button>
+                </div>
+            </div>
+
+        </div>
+    </footer>
+
+    <!-- Game Engine & Audio Script -->
+    <script>
+        // --- Web Audio API Synth Generator ---
+        class SoundEngine {
+            constructor() {
+                this.ctx = null;
+                this.muted = false;
+            }
+
+            init() {
+                if (!this.ctx) {
+                    this.ctx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+            }
+
+            playHit() {
+                if (this.muted) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(140, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(35, this.ctx.currentTime + 0.12);
+                gain.gain.setValueAtTime(0.5, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.12);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.12);
+            }
+
+            playExplosion() {
+                if (this.muted) return;
+                this.init();
+                const bufferSize = this.ctx.sampleRate * 0.4;
+                const buffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+                const data = buffer.getChannelData(0);
+                for (let i = 0; i < bufferSize; i++) {
+                    data[i] = Math.random() * 2 - 1;
+                }
+                const noise = this.ctx.createBufferSource();
+                noise.buffer = buffer;
+
+                const filter = this.ctx.createBiquadFilter();
+                filter.type = 'lowpass';
+                filter.frequency.setValueAtTime(700, this.ctx.currentTime);
+                filter.frequency.linearRampToValueAtTime(40, this.ctx.currentTime + 0.4);
+
+                const gain = this.ctx.createGain();
+                gain.gain.setValueAtTime(0.7, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.4);
+
+                noise.connect(filter);
+                filter.connect(gain);
+                gain.connect(this.ctx.destination);
+                noise.start();
+            }
+
+            playLaser() {
+                if (this.muted) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(950, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(120, this.ctx.currentTime + 0.2);
+                gain.gain.setValueAtTime(0.35, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.2);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.2);
+            }
+
+            playMeteor() {
+                if (this.muted) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(250, this.ctx.currentTime);
+                osc.frequency.linearRampToValueAtTime(30, this.ctx.currentTime + 0.5);
+                gain.gain.setValueAtTime(0.6, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.5);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.5);
+            }
+
+            playVoice() {
+                if (this.muted) return;
+                this.init();
+                const osc = this.ctx.createOscillator();
+                const gain = this.ctx.createGain();
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(500 + Math.random() * 200, this.ctx.currentTime);
+                osc.frequency.exponentialRampToValueAtTime(800, this.ctx.currentTime + 0.15);
+                gain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+                gain.gain.exponentialRampToValueAtTime(0.01, this.ctx.currentTime + 0.15);
+                osc.connect(gain);
+                gain.connect(this.ctx.destination);
+                osc.start();
+                osc.stop(this.ctx.currentTime + 0.15);
+            }
+        }
+
+        const sound = new SoundEngine();
+
+        // --- Game Setup & Variables ---
+        const canvas = document.getElementById('gameCanvas');
+        const ctx = canvas.getContext('2d');
+
+        let currentSchool = 'myungho';
+        let currentCharacter = 'hyechaeng';
+        let currentWeapon = 'hammer';
+
+        let blocks = [];
+        let particles = [];
+        let floatingTexts = [];
+        let companions = [];
+        
+        let screenShake = 0;
+        let comboCount = 0;
+        let lastHitTime = 0;
+        let totalBlocksCount = 0;
+        let isCleared = false;
+
+        let mouseX = 0;
+        let mouseY = 0;
+        let isAttacking = false;
+
+        // Colors Palette
+        const COLORS = {
+            brickYellow: '#fef08a',
+            brickOrange: '#fb923c',
+            brickRed: '#ef4444',
+            brickBlue: '#38bdf8',
+            sindoBrick: '#94a3b8',
+            sindoDark: '#334155',
+            roofBlue: '#0284c7',
+            roofRed: '#dc2626',
+            glass: '#a5f3fc',
+            clockFace: '#ffffff',
+            ground: '#334155',
+            grass: '#22c55e'
+        };
+
+        // Resize Canvas
+        function resizeCanvas() {
+            canvas.width = canvas.parentElement.clientWidth;
+            canvas.height = canvas.parentElement.clientHeight;
+            initGame();
+        }
+
+        window.addEventListener('resize', resizeCanvas);
+
+        // --- Block Class ---
+        class Block {
+            constructor(x, y, width, height, color, type = 'normal') {
+                this.x = x;
+                this.y = y;
+                this.width = width;
+                this.height = height;
+                this.color = color;
+                this.type = type; // 'normal', 'glass', 'clock', 'gate', 'crest'
+                this.hp = type === 'glass' ? 1 : 2;
+                this.maxHp = this.hp;
+                this.destroyed = false;
+            }
+
+            draw() {
+                if (this.destroyed) return;
+
+                ctx.save();
+                ctx.fillStyle = this.color;
+                ctx.fillRect(this.x, this.y, this.width, this.height);
+
+                // Highlight & Border for Voxel look
+                ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+                ctx.lineWidth = 1.5;
+                ctx.strokeRect(this.x, this.y, this.width, this.height);
+
+                // Specific Block Details
+                if (this.type === 'glass') {
+                    ctx.fillStyle = 'rgba(255,255,255,0.4)';
+                    ctx.fillRect(this.x + 2, this.y + 2, this.width / 2, this.height / 2);
+                } else if (this.type === 'clock') {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.beginPath();
+                    ctx.arc(this.x + this.width / 2, this.y + this.height / 2, Math.min(this.width, this.height) * 0.4, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 1;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + this.width / 2, this.y + this.height / 2);
+                    ctx.lineTo(this.x + this.width / 2, this.y + this.height * 0.25);
+                    ctx.moveTo(this.x + this.width / 2, this.y + this.height / 2);
+                    ctx.lineTo(this.x + this.width * 0.7, this.y + this.height / 2);
+                    ctx.stroke();
+                } else if (this.type === 'crest') {
+                    ctx.fillStyle = '#f59e0b';
+                    ctx.font = 'bold 12px Jua';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🏫', this.x + this.width / 2, this.y + this.height * 0.7);
+                }
+
+                // Cracks on damage
+                if (this.hp < this.maxHp) {
+                    ctx.strokeStyle = 'rgba(0, 0, 0, 0.6)';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(this.x + 2, this.y + 2);
+                    ctx.lineTo(this.x + this.width - 2, this.y + this.height - 2);
+                    ctx.stroke();
+                }
+
+                ctx.restore();
+            }
+
+            hit(damage, angle = 0) {
+                if (this.destroyed) return false;
+                this.hp -= damage;
+                
+                // Spawn Debris Particles
+                const particleCount = this.hp <= 0 ? 8 : 3;
+                for (let i = 0; i < particleCount; i++) {
+                    particles.push(new Particle(
+                        this.x + this.width / 2,
+                        this.y + this.height / 2,
+                        this.color,
+                        angle
+                    ));
+                }
+
+                if (this.hp <= 0) {
+                    this.destroyed = true;
+                    return true;
+                }
+                return false;
+            }
+        }
+
+        // --- Particle Class (Debris / Laser / Meteor) ---
+        class Particle {
+            constructor(x, y, color, baseAngle = 0) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
+                this.size = Math.random() * 6 + 3;
+                const speed = Math.random() * 6 + 2;
+                const angle = baseAngle + (Math.random() - 0.5) * Math.PI;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed - Math.random() * 3;
+                this.gravity = 0.35;
+                this.alpha = 1;
+                this.decay = Math.random() * 0.03 + 0.015;
+                this.rotation = Math.random() * Math.PI * 2;
+                this.vRot = (Math.random() - 0.5) * 0.2;
+            }
+
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.vy += this.gravity;
+                this.rotation += this.vRot;
+                this.alpha -= this.decay;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rotation);
+                ctx.fillStyle = this.color;
+                ctx.fillRect(-this.size / 2, -this.size / 2, this.size, this.size);
+                ctx.restore();
+            }
+        }
+
+        // --- Floating Damage / Combo Text ---
+        class FloatingText {
+            constructor(x, y, text, color = '#f59e0b') {
+                this.x = x;
+                this.y = y;
+                this.text = text;
+                this.color = color;
+                this.alpha = 1;
+                this.vy = -2;
+            }
+
+            update() {
+                this.y += this.vy;
+                this.alpha -= 0.025;
+            }
+
+            draw() {
+                ctx.save();
+                ctx.globalAlpha = Math.max(0, this.alpha);
+                ctx.font = 'extrabold 22px Jua';
+                ctx.fillStyle = this.color;
+                ctx.strokeStyle = '#000000';
+                ctx.lineWidth = 3;
+                ctx.strokeText(this.text, this.x, this.y);
+                ctx.fillText(this.text, this.x, this.y);
+                ctx.restore();
+            }
+        }
+
+        // --- Chiikawa Friends Companion Class ---
+        class Companion {
+            constructor(name, x, y, emoji, color) {
+                this.name = name;
+                this.x = x;
+                this.y = y;
+                this.emoji = emoji;
+                this.color = color;
+                this.state = 'idle'; // 'idle', 'surprised'
+                this.timer = 0;
+                this.speech = '';
+            }
+
+            react() {
+                this.state = 'surprised';
+                this.timer = 45;
+                const lines = {
+                    '치이카와': ['와아-!!', '응아...!', '히익!'],
+                    '하치와레': ['자, 잠깐만!', '무슨 일이야?!', '학교가...!!'],
+                    '우사기': ['우라-!!', '야하-!!', '풀-야!!']
+                };
+                const choices = lines[this.name] || ['앗!'];
+                this.speech = choices[Math.floor(Math.random() * choices.length)];
+                sound.playVoice();
+            }
+
+            update() {
+                if (this.timer > 0) {
+                    this.timer--;
+                    if (this.timer === 0) {
+                        this.state = 'idle';
+                        this.speech = '';
+                    }
+                }
+            }
+
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+
+                // Surprised bounce
+                if (this.state === 'surprised') {
+                    ctx.translate(0, -Math.sin(this.timer * 0.3) * 8);
+                }
+
+                // Draw Chiikawa Style Body Circle
+                ctx.beginPath();
+                ctx.arc(0, 0, 22, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                ctx.strokeStyle = '#334155';
+                ctx.lineWidth = 2.5;
+                ctx.stroke();
+
+                // Specific Companion Features
+                if (this.name === '하치와레') {
+                    // Blue ears cap
+                    ctx.fillStyle = '#38bdf8';
+                    ctx.beginPath();
+                    ctx.arc(-10, -14, 9, 0, Math.PI * 2);
+                    ctx.arc(10, -14, 9, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                } else if (this.name === '우사기') {
+                    // Long ears
+                    ctx.fillStyle = '#fef08a';
+                    ctx.beginPath();
+                    ctx.ellipse(-10, -26, 6, 16, -0.2, 0, Math.PI * 2);
+                    ctx.ellipse(10, -26, 6, 16, 0.2, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.stroke();
+                }
+
+                // Face Expression
+                ctx.fillStyle = '#000000';
+                if (this.state === 'surprised') {
+                    // O_O eyes
+                    ctx.beginPath();
+                    ctx.arc(-7, -2, 3, 0, Math.PI * 2);
+                    ctx.arc(7, -2, 3, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Open mouth
+                    ctx.beginPath();
+                    ctx.arc(0, 6, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = '#ef4444';
+                    ctx.fill();
+                } else {
+                    // Happy eyes
+                    ctx.beginPath();
+                    ctx.arc(-7, -2, 2.5, 0, Math.PI * 2);
+                    ctx.arc(7, -2, 2.5, 0, Math.PI * 2);
+                    ctx.fill();
+                    // Pink cheeks
+                    ctx.fillStyle = '#f472b6';
+                    ctx.beginPath();
+                    ctx.arc(-12, 3, 3.5, 0, Math.PI * 2);
+                    ctx.arc(12, 3, 3.5, 0, Math.PI * 2);
+                    ctx.fill();
+                }
+
+                // Speech Bubble
+                if (this.speech) {
+                    ctx.fillStyle = '#ffffff';
+                    ctx.strokeStyle = '#000000';
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.roundRect(-30, -55, 60, 24, 8);
+                    ctx.fill();
+                    ctx.stroke();
+
+                    ctx.fillStyle = '#000000';
+                    ctx.font = 'bold 12px Jua';
+                    ctx.textAlign = 'center';
+                    ctx.fillText(this.speech, 0, -39);
+                }
+
+                // Name tag
+                ctx.fillStyle = '#cbd5e1';
+                ctx.font = '11px Jua';
+                ctx.textAlign = 'center';
+                ctx.fillText(this.name, 0, 34);
+
+                ctx.restore();
+            }
+        }
+
+        // --- Init Game & Build School ---
+        function initGame() {
+            blocks = [];
+            particles = [];
+            floatingTexts = [];
+            companions = [];
+            isCleared = false;
+            comboCount = 0;
+            document.getElementById('clear-modal').classList.add('hidden');
+
+            const bw = 24; // block width
+            const bh = 20; // block height
+            const startX = Math.floor(canvas.width / 2);
+            const groundY = Math.floor(canvas.height * 0.75);
+
+            if (currentSchool === 'myungho') {
+                // --- 명호초등학교 (부산) Layout ---
+                document.getElementById('school-name-display').innerText = '명호초등학교 (부산)';
+                
+                // Building Main Structure (Colorful & Primary Style)
+                const rows = 10;
+                const cols = 22;
+                const leftX = startX - (cols * bw) / 2;
+
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        const bx = leftX + c * bw;
+                        const by = groundY - (rows - r) * bh;
+
+                        let color = COLORS.brickYellow;
+                        let type = 'normal';
+
+                        // Roof line
+                        if (r === 0) {
+                            color = COLORS.roofRed;
+                        } 
+                        // Windows grid
+                        else if (r % 2 === 1 && c % 3 === 1 && c > 1 && c < cols - 2) {
+                            color = COLORS.glass;
+                            type = 'glass';
+                        }
+                        // Clock tower center top
+                        else if (r <= 2 && c >= 9 && c <= 12) {
+                            if (r === 1 && (c === 10 || c === 11)) {
+                                color = COLORS.clockFace;
+                                type = 'clock';
+                            } else {
+                                color = COLORS.brickOrange;
+                            }
+                        }
+                        // Main entrance
+                        else if (r >= 7 && c >= 9 && c <= 12) {
+                            color = COLORS.brickOrange;
+                            if (r === 7 && c === 10) type = 'crest';
+                        }
+
+                        blocks.push(new Block(bx, by, bw, bh, color, type));
+                    }
+                }
+            } else {
+                // --- 신도고등학교 (부산) Layout ---
+                document.getElementById('school-name-display').innerText = '신도고등학교 (부산)';
+
+                // Highschool layout (Twin wings + main high rise)
+                const rows = 12;
+                const cols = 26;
+                const leftX = startX - (cols * bw) / 2;
+
+                for (let r = 0; r < rows; r++) {
+                    for (let c = 0; c < cols; c++) {
+                        const bx = leftX + c * bw;
+                        const by = groundY - (rows - r) * bh;
+
+                        let color = COLORS.sindoBrick;
+                        let type = 'normal';
+
+                        // Roof line
+                        if (r === 0) {
+                            color = COLORS.roofBlue;
+                        } 
+                        // High school multi-floor windows
+                        else if (r % 2 === 0 && (c % 2 === 0) && c > 0 && c < cols - 1) {
+                            color = COLORS.glass;
+                            type = 'glass';
+                        }
+                        // Center entrance & pillars
+                        else if (r >= 8 && c >= 10 && c <= 15) {
+                            color = COLORS.sindoDark;
+                            if (r === 8 && c === 12) type = 'crest';
+                        }
+
+                        blocks.push(new Block(bx, by, bw, bh, color, type));
+                    }
+                }
+            }
+
+            totalBlocksCount = blocks.length;
+
+            // Spawn Companions around school
+            companions = [
+                new Companion('치이카와', startX - 220, groundY + 15, '🥚', '#ffffff'),
+                new Companion('하치와레', startX + 220, groundY + 15, '🐱', '#38bdf8'),
+                new Companion('우사기', startX, groundY + 25, '🐰', '#fef08a')
+            ];
+
+            updateUI();
+        }
+
+        // --- Attack Physics & Action Handler ---
+        function executeAttack(x, y) {
+            if (isCleared) return;
+
+            const now = Date.now();
+            if (now - lastHitTime < 1500) {
+                comboCount++;
+            } else {
+                comboCount = 1;
+            }
+            lastHitTime = now;
+
+            // Trigger Companions Reaction
+            companions.forEach(comp => comp.react());
+
+            let hitAny = false;
+            let radius = 40;
+            let damage = 1;
+
+            // Weapon Properties
+            switch (currentWeapon) {
+                case 'hammer':
+                    radius = 50;
+                    damage = 2;
+                    screenShake = 6;
+                    sound.playHit();
+                    break;
+                case 'wrecking':
+                    radius = 90;
+                    damage = 2;
+                    screenShake = 12;
+                    sound.playExplosion();
+                    break;
+                case 'dynamite':
+                    radius = 120;
+                    damage = 3;
+                    screenShake = 18;
+                    sound.playExplosion();
+                    // Explosion Effect
+                    for (let i = 0; i < 25; i++) {
+                        particles.push(new Particle(x, y, '#f97316', Math.random() * Math.PI * 2));
+                        particles.push(new Particle(x, y, '#ef4444', Math.random() * Math.PI * 2));
+                    }
+                    break;
+                case 'laser':
+                    radius = 35;
+                    damage = 3;
+                    screenShake = 5;
+                    sound.playLaser();
+                    break;
+                case 'meteor':
+                    radius = 150;
+                    damage = 4;
+                    screenShake = 25;
+                    sound.playMeteor();
+                    sound.playExplosion();
+                    for (let i = 0; i < 40; i++) {
+                        particles.push(new Particle(x, y, '#f59e0b', Math.random() * Math.PI * 2));
+                    }
+                    break;
+            }
+
+            // Apply Damage to Blocks
+            blocks.forEach(b => {
+                if (b.destroyed) return;
+                const bx = b.x + b.width / 2;
+                const by = b.y + b.height / 2;
+                const dist = Math.hypot(bx - x, by - y);
+
+                // Laser reaches top-to-bottom
+                const isLaserHit = (currentWeapon === 'laser' && Math.abs(bx - x) < 25);
+
+                if (dist < radius || isLaserHit) {
+                    const angle = Math.atan2(by - y, bx - x);
+                    if (b.hit(damage, angle)) {
+                        hitAny = true;
+                    }
+                }
+            });
+
+            // Floating Combo Text
+            if (comboCount > 1) {
+                floatingTexts.push(new FloatingText(x, y - 30, `${comboCount} COMBO!`, '#fbbf24'));
+            }
+
+            updateUI();
+        }
+
+        // --- UI Updates ---
+        function updateUI() {
+            const activeBlocks = blocks.filter(b => !b.destroyed).length;
+            const hpPercent = Math.max(0, Math.round((activeBlocks / totalBlocksCount) * 100));
+
+            const hpBar = document.getElementById('hp-bar');
+            const statusText = document.getElementById('status-text');
+            const comboText = document.getElementById('combo-text');
+
+            hpBar.style.width = `${hpPercent}%`;
+            statusText.innerText = `내구도: ${hpPercent}%`;
+            comboText.innerText = `${comboCount} COMBO`;
+
+            if (hpPercent === 0 && !isCleared) {
+                isCleared = true;
+                setTimeout(() => {
+                    document.getElementById('clear-modal').classList.remove('hidden');
+                }, 300);
+            }
+        }
+
+        // --- Draw Attacking Character (혜챙 / 주챙) ---
+        function drawAttackerCharacter() {
+            const charX = mouseX;
+            const charY = Math.min(mouseY, canvas.height * 0.85);
+
+            ctx.save();
+            ctx.translate(charX, charY);
+
+            // Character Base Shadow
+            ctx.fillStyle = 'rgba(0,0,0,0.3)';
+            ctx.beginPath();
+            ctx.ellipse(0, 45, 20, 8, 0, 0, Math.PI * 2);
+            ctx.fill();
+
+            // Character Head / Body
+            if (currentCharacter === 'hyechaeng') {
+                // --- 혜챙 (단발머리) ---
+                // Short Black/Brown Hair Back
+                ctx.fillStyle = '#1e293b';
+                ctx.beginPath();
+                ctx.arc(0, -5, 24, Math.PI, Math.PI * 2);
+                ctx.fillRect(-24, -5, 48, 20);
+                ctx.fill();
+
+                // Skin Face
+                ctx.fillStyle = '#fde047';
+                ctx.beginPath();
+                ctx.arc(0, 0, 18, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Cute Eyes
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.arc(-6, -2, 2.5, 0, Math.PI * 2);
+                ctx.arc(6, -2, 2.5, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Front Bangs (Short hair style)
+                ctx.fillStyle = '#1e293b';
+                ctx.beginPath();
+                ctx.arc(0, -6, 20, Math.PI * 1.1, Math.PI * 1.9);
+                ctx.fill();
+
+                // Clothes (Pink Jacket)
+                ctx.fillStyle = '#ec4899';
+                ctx.fillRect(-12, 16, 24, 25);
+            } else {
+                // --- 주챙 (안경 남성) ---
+                // Short Neat Hair
+                ctx.fillStyle = '#334155';
+                ctx.beginPath();
+                ctx.arc(0, -6, 20, Math.PI, Math.PI * 2);
+                ctx.fill();
+
+                // Skin Face
+                ctx.fillStyle = '#fde047';
+                ctx.beginPath();
+                ctx.arc(0, 0, 18, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Glasses (안경)
+                ctx.strokeStyle = '#0284c7';
+                ctx.lineWidth = 2.5;
+                ctx.strokeRect(-12, -6, 9, 7);
+                ctx.strokeRect(3, -6, 9, 7);
+                ctx.beginPath();
+                ctx.moveTo(-3, -3);
+                ctx.lineTo(3, -3);
+                ctx.stroke();
+
+                // Eyes inside glasses
+                ctx.fillStyle = '#0f172a';
+                ctx.beginPath();
+                ctx.arc(-7, -2, 2, 0, Math.PI * 2);
+                ctx.arc(7, -2, 2, 0, Math.PI * 2);
+                ctx.fill();
+
+                // Clothes (Blue Shirt)
+                ctx.fillStyle = '#0284c7';
+                ctx.fillRect(-12, 16, 24, 25);
+            }
+
+            // Weapon Render in Hand
+            ctx.fillStyle = '#f59e0b';
+            let weaponEmoji = '🔨';
+            if (currentWeapon === 'wrecking') weaponEmoji = '🏗️';
+            if (currentWeapon === 'dynamite') weaponEmoji = '🧨';
+            if (currentWeapon === 'laser') weaponEmoji = '⚡';
+            if (currentWeapon === 'meteor') weaponEmoji = '☄️';
+
+            ctx.font = '26px Jua';
+            ctx.fillText(weaponEmoji, 15, 10);
+
+            ctx.restore();
+        }
+
+        // --- Main Game Loop ---
+        function animate() {
+            ctx.save();
+
+            // Apply Screen Shake
+            if (screenShake > 0) {
+                const sx = (Math.random() - 0.5) * screenShake;
+                const sy = (Math.random() - 0.5) * screenShake;
+                ctx.translate(sx, sy);
+                screenShake *= 0.88;
+                if (screenShake < 0.2) screenShake = 0;
+            }
+
+            // Clear Background (Sky & Night vibe)
+            ctx.fillStyle = '#0f172a';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Ground & School Yard Grass
+            const groundY = canvas.height * 0.75;
+            ctx.fillStyle = COLORS.ground;
+            ctx.fillRect(0, groundY, canvas.width, canvas.height - groundY);
+            ctx.fillStyle = COLORS.grass;
+            ctx.fillRect(0, groundY, canvas.width, 10);
+
+            // Draw School Blocks
+            blocks.forEach(b => b.draw());
+
+            // Draw Chiikawa Friends
+            companions.forEach(c => {
+                c.update();
+                c.draw();
+            });
+
+            // Draw Particles
+            for (let i = particles.length - 1; i >= 0; i--) {
+                const p = particles[i];
+                p.update();
+                p.draw();
+                if (p.alpha <= 0) particles.splice(i, 1);
+            }
+
+            // Draw Floating Damage Texts
+            for (let i = floatingTexts.length - 1; i >= 0; i--) {
+                const ft = floatingTexts[i];
+                ft.update();
+                ft.draw();
+                if (ft.alpha <= 0) floatingTexts.splice(i, 1);
+            }
+
+            // Draw Laser Beam FX
+            if (isAttacking && currentWeapon === 'laser') {
+                ctx.strokeStyle = '#38bdf8';
+                ctx.lineWidth = 14;
+                ctx.shadowColor = '#0284c7';
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.moveTo(mouseX, 0);
+                ctx.lineTo(mouseX, canvas.height);
+                ctx.stroke();
+                ctx.shadowBlur = 0;
+            }
+
+            // Draw Current Attacker Character
+            drawAttackerCharacter();
+
+            ctx.restore();
+            requestAnimationFrame(animate);
+        }
+
+        // --- Event Listeners ---
+        canvas.addEventListener('mousemove', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+        });
+
+        canvas.addEventListener('mousedown', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            mouseX = e.clientX - rect.left;
+            mouseY = e.clientY - rect.top;
+            isAttacking = true;
+            executeAttack(mouseX, mouseY);
+        });
+
+        canvas.addEventListener('mouseup', () => {
+            isAttacking = false;
+        });
+
+        // Touch device support
+        canvas.addEventListener('touchstart', (e) => {
+            const rect = canvas.getBoundingClientRect();
+            const touch = e.touches[0];
+            mouseX = touch.clientX - rect.left;
+            mouseY = touch.clientY - rect.top;
+            isAttacking = true;
+            executeAttack(mouseX, mouseY);
+        });
+
+        canvas.addEventListener('touchend', () => {
+            isAttacking = false;
+        });
+
+        // Buttons Handler (School, Character, Weapon Selectors)
+        document.querySelectorAll('.school-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.school-btn').forEach(b => b.classList.remove('active'));
+                const target = e.currentTarget;
+                target.classList.add('active');
+                currentSchool = target.dataset.school;
+                initGame();
+            });
+        });
+
+        document.querySelectorAll('.char-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.char-btn').forEach(b => b.classList.remove('active'));
+                const target = e.currentTarget;
+                target.classList.add('active');
+                currentCharacter = target.dataset.char;
+            });
+        });
+
+        document.querySelectorAll('.weapon-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.weapon-btn').forEach(b => b.classList.remove('active'));
+                const target = e.currentTarget;
+                target.classList.add('active');
+                currentWeapon = target.dataset.weapon;
+            });
+        });
+
+        // Sound Toggle Button
+        document.getElementById('sound-btn').addEventListener('click', () => {
+            sound.muted = !sound.muted;
+            const icon = document.getElementById('sound-icon');
+            if (sound.muted) {
+                icon.className = 'fa-solid fa-volume-xmark text-slate-500';
+            } else {
+                icon.className = 'fa-solid fa-volume-high text-amber-400';
+            }
+        });
+
+        // Reset Buttons
+        document.getElementById('reset-btn').addEventListener('click', initGame);
+        document.getElementById('modal-reset-btn').addEventListener('click', initGame);
+
+        // Start Loop
+        window.onload = () => {
+            resizeCanvas();
+            animate();
+        };
+    </script>
+</body>
+</html>
